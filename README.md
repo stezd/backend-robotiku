@@ -49,9 +49,9 @@ Pastikan perangkat berikut sudah terpasang:
 
    Perintah tersebut memasang dependency PHP, membuat `.env`, menghasilkan application key, menjalankan migration, memasang dependency JavaScript, dan membuat build frontend.
 
-3. Tinjau konfigurasi `.env`. Secara default aplikasi menggunakan SQLite. Untuk memakai database lain, sesuaikan `DB_CONNECTION`, `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, dan `DB_PASSWORD`.
+3. Tinjau konfigurasi `.env`. Template proyek menggunakan MySQL dengan database `robotiku`. Sesuaikan `DB_CONNECTION`, `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, dan `DB_PASSWORD` dengan lingkungan lokal Anda.
 
-4. Jika menggunakan SQLite dan file database belum tersedia, buat file-nya lalu jalankan migration:
+4. Jika memilih SQLite dan file database belum tersedia, buat file-nya lalu jalankan migration:
 
    ```bash
    touch database/database.sqlite
