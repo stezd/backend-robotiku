@@ -204,6 +204,13 @@ Route::prefix('v1')->group(function () {
             Route::get('e-rapot/{eReport}/excel', [EReportController::class, 'exportExcel']);
             Route::get('sesi/rekap', [SessionController::class, 'rekap']);
             Route::get('sesi/{session}/detail', [SessionController::class, 'show']);
+            Route::get('sesi/kelas', [SessionController::class, 'myClasses']);
+            Route::get('sesi/kelas/{kelas}/list', [SessionController::class, 'classSessions']);
+            Route::post('sesi/manual', [SessionController::class, 'manualStore']);
+            Route::post('sesi/mulai', [SessionController::class, 'start']);
+            Route::get('sesi/{session}/murid', [SessionController::class, 'students']);
+            Route::post('sesi/{session}/absensi', [SessionController::class, 'attend']);
+            Route::post('sesi/{session}/selesai', [SessionController::class, 'end']);
         });
 
         Route::middleware('role:admin,super_admin')->group(function () {
