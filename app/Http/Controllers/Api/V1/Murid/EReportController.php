@@ -243,11 +243,15 @@ class EReportController extends Controller
 
         $sig = null;
         if (($sp = optional($eReport->trainer)->signature_image) && Storage::disk('local')->exists($sp)) {
-            $mime = Storage::disk('local')->mimeType($sp) ?: 'image/png';   // ← bukan lagi image/webp
-            $sig = 'data:' . $mime . ';base64,' . base64_encode(Storage::disk('local')->get($sp));
+            $ext  = strtolower(pathinfo($sp, PATHINFO_EXTENSION));
+            $mime = ['png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg'][$ext] ?? 'image/png';
+            $sig  = 'data:' . $mime . ';base64,' . base64_encode(Storage::disk('local')->get($sp));
         }
+
         $logo = null;
-        if (is_file($lp = public_path('images/robotiku-logo.png'))) $logo = 'data:image/png;base64,' . base64_encode(file_get_contents($lp));
+        if (is_file($lp = public_path('images/robotiku-logo.png'))) {
+            $logo = 'data:image/png;base64,' . base64_encode(file_get_contents($lp));
+        }
 
         $pdf = Pdf::loadView('erapot.pdf', ['r' => $eReport, 'sig' => $sig, 'logo' => $logo])->setPaper('a4', 'portrait');
         return $pdf->download("E-Rapot-{$eReport->student->student_code}-S{$eReport->semester}-{$eReport->year}.pdf");

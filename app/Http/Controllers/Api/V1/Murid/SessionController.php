@@ -24,18 +24,17 @@ class SessionController extends Controller
 
     public function myClasses(Request $request): JsonResponse
     {
-        $tid = $request->user()->id;
-        $classes = Kelas::query()
-            ->where(fn($q) => $q->whereHas('trainers', fn($t) => $t->where('users.id', $tid))->orWhere('trainer_id', $tid))
+        $user = $request->user();
+        $tid = $user->id;
+        $q = Kelas::query()
             ->with('program:id,name', 'school:id,name')
-            ->withCount(['students as active_count' => fn($q) => $q->where('students.status', 'aktif')])
-            ->orderBy('name')->get();
+            ->withCount(['students as active_count' => fn($x) => $x->where('students.status', 'aktif')])
+            ->orderBy('name');
 
-        $classes->each(function ($k) {
-            $s = Session::where('class_id', $k->id)->whereDate('started_at', today())->latest()->first();
-            $k->setAttribute('today_session', $s ? ['id' => $s->id, 'status' => $s->status, 'started_at' => $s->started_at] : null);
-        });
-        return $this->success($classes, 'Kelas Anda.');
+        if (! in_array($user->role, ['admin', 'super_admin'], true)) {
+            $q->where(fn($w) => $w->whereHas('trainers', fn($t) => $t->where('users.id', $tid))->orWhere('trainer_id', $tid));
+        }
+        return $this->success($q->get(), 'Kelas.');
     }
 
     /** Mulai Sesi: GPS + selfie → session started → WA "dimulai" ke semua ortu. */
@@ -48,24 +47,27 @@ class SessionController extends Controller
             'photo'     => ['required', 'file', 'mimes:jpg,jpeg,png', 'max:5120'],
         ]);
         $kelas = Kelas::findOrFail($data['class_id']);
-        abort_unless($this->isTrainerOf($kelas, $request->user()->id), 403, 'Kelas ini bukan kelas Anda.');
-        if (Session::where('class_id', $kelas->id)->whereDate('started_at', today())->where('status', 'started')->exists()) {
-            return $this->error('Sesi hari ini sudah dimulai.', 422);
+        abort_unless($this->canManage($kelas, $request->user()), 403, 'Kelas ini bukan kelas Anda.');
+
+        // hanya cek sesi LIVE yang masih berjalan hari ini
+        if (Session::where('class_id', $kelas->id)->where('is_manual', false)
+            ->whereDate('started_at', today())->where('status', 'started')->exists()
+        ) {
+            return $this->error('Sesi langsung hari ini sudah dimulai.', 422);
         }
         [$cLat, $cLng, $r] = $this->resolveGeofence($kelas);
         if ($cLat !== null && $this->haversine($cLat, $cLng, (float) $data['latitude'], (float) $data['longitude']) > $r) {
             return $this->error('Anda di luar radius lokasi kelas ini.', 422);
         }
 
-        // Pekan ke-berapa dalam periode, mengikuti meetings_per_period kelas (display saja).
         $perPeriod = max(1, (int) ($kelas->meetings_per_period ?: 4));
-        $done = Session::where('class_id', $kelas->id)->count();
-        $week = ($done % $perPeriod) + 1;
+        $week = (Session::where('class_id', $kelas->id)->count() % $perPeriod) + 1;
 
         $session = Session::create([
             'class_id'        => $kelas->id,
-            'period_id'       => null,       // fitur Periode dilepas — tak dipakai lagi
+            'period_id'       => null,
             'week'            => $week,
+            'is_manual'       => false,
             'trainer_id'      => $request->user()->id,
             'start_latitude'  => $data['latitude'],
             'start_longitude' => $data['longitude'],
@@ -79,7 +81,7 @@ class SessionController extends Controller
 
     public function students(Session $session): JsonResponse
     {
-        abort_unless($session->trainer_id === request()->user()->id, 403, 'Bukan sesi Anda.');
+        abort_unless($this->canManageSession($session, request()->user()), 403, 'Bukan sesi Anda.');
         $students = $session->kelas->students()->where('students.status', 'aktif')->orderBy('name')->get(['students.id', 'student_code', 'name']);
         $att = $session->attendances()->get(['student_id', 'status', 'score', 'report', 'photo'])->keyBy('student_id');
 
@@ -92,15 +94,23 @@ class SessionController extends Controller
             'report' => $att[$s->id]->report ?? null,
             'photo' => $att[$s->id]->photo ?? null,
         ]);
-        return $this->success(['session' => ['id' => $session->id, 'status' => $session->status], 'students' => $data], 'Murid sesi.');
+        return $this->success([
+            'session' => [
+                'id'        => $session->id,
+                'status'    => $session->status,
+                'is_manual' => (bool) $session->is_manual,
+                'class_id'  => $session->class_id,
+            ],
+            'students' => $data,
+        ], 'Murid sesi.');
     }
 
     /** Absensi 1 murid: status + foto + nilai + laporan → WA per status + billing/SPP. */
     /** Absensi 1 murid: status + foto + nilai + laporan → WA per status + billing/SPP. */
     public function attend(Request $request, Session $session): JsonResponse
     {
-        abort_unless($session->trainer_id === $request->user()->id, 403, 'Bukan sesi Anda.');
-        if ($session->status === 'ended') return $this->error('Sesi sudah selesai.', 422);
+        abort_unless($this->canManageSession($session, $request->user()), 403, 'Bukan sesi Anda.');
+        if (! $session->is_manual && $session->status === 'ended') return $this->error('Sesi sudah selesai.', 422);
 
         $data = $request->validate([
             'student_id' => ['required', 'exists:students,id'],
@@ -119,27 +129,27 @@ class SessionController extends Controller
 
         $att = $existing ?? new Attendance();
         $att->fill([
-            'session_id'  => $session->id,
-            'class_id'    => $session->class_id,
-            'student_id'  => $student->id,
-            'trainer_id'  => $session->trainer_id,
-            'status'      => $data['status'],
-            'score'       => $data['score'] ?? null,
-            'report'      => $data['report'] ?? null,
+            'session_id' => $session->id,
+            'class_id' => $session->class_id,
+            'student_id' => $student->id,
+            'trainer_id' => $session->trainer_id,
+            'status' => $data['status'],
+            'score' => $data['score'] ?? null,
+            'report' => $data['report'] ?? null,
             'attended_at' => now(),
         ]);
         if ($request->hasFile('photo')) $att->photo = ImageStorage::storeWebp($request->file('photo'), 'attendances');
         $att->save();
 
-        // WA notifikasi status kehadiran ke ortu — dikirim saat baru ATAU status berubah (hindari spam saat edit lain)
-        if ($isNew || $oldStatus !== $data['status']) {
+        // WA status kehadiran hanya untuk sesi LANGSUNG (bukan susulan)
+        if (! $session->is_manual && ($isNew || $oldStatus !== $data['status'])) {
             $this->notifyStatus($student, $data['status']);
         }
 
-        // Billing per-murid saat hadir (buat tagihan periode berikutnya bila batas periode tercapai)
+        // Billing tetap jalan (kelas memang terjadi); reminder WA hanya untuk sesi langsung
         if ($data['status'] === 'hadir') {
             $invoice = $this->billing->onAttendance($student, $session->kelas);
-            if ($invoice && $invoice->status === 'belum_bayar') $this->notifySpp($student);
+            if ($invoice && $invoice->status === 'belum_bayar' && ! $session->is_manual) $this->notifySpp($student);
         }
 
         return $this->success(['attendance_id' => $att->id], 'Absensi tersimpan.', $isNew ? 201 : 200);
@@ -148,12 +158,18 @@ class SessionController extends Controller
     /** Selesai Sesi: GPS + foto → WA "selesai" (nama+nomor trainer). */
     public function end(Request $request, Session $session): JsonResponse
     {
-        abort_unless($session->trainer_id === $request->user()->id, 403, 'Bukan sesi Anda.');
+        abort_unless($this->canManageSession($session, $request->user()), 403, 'Bukan sesi Anda.');
         if ($session->status === 'ended') return $this->error('Sesi sudah selesai.', 422);
+
+        if ($session->is_manual) {   // manual: tanpa GPS/foto
+            $session->update(['ended_at' => now(), 'status' => 'ended']);
+            return $this->success($session->fresh(), 'Sesi ditandai selesai.');
+        }
+
         $data = $request->validate([
-            'latitude' => ['required', 'numeric'],
+            'latitude'  => ['required', 'numeric'],
             'longitude' => ['required', 'numeric'],
-            'photo' => ['required', 'file', 'mimes:jpg,jpeg,png', 'max:5120'],
+            'photo'     => ['required', 'file', 'mimes:jpg,jpeg,png', 'max:5120'],
         ]);
         $session->update([
             'end_latitude' => $data['latitude'],
@@ -284,5 +300,60 @@ class SessionController extends Controller
             ? $q->where('scope', 'sekolah')->where('school_id', $kelas->school_id)
             : $q->where('scope', 'mandiri');
         return $this->success($q->orderBy('number')->get(['id', 'name', 'number']), 'Periode kelas.');
+    }
+
+    private function canManage(Kelas $k, $user): bool
+    {
+        return in_array($user->role, ['admin', 'super_admin'], true) || $this->isTrainerOf($k, $user->id);
+    }
+    private function canManageSession(Session $s, $user): bool
+    {
+        if (in_array($user->role, ['admin', 'super_admin'], true)) return true;
+        if ($s->trainer_id === $user->id) return true;
+        return $s->kelas->trainers()->where('users.id', $user->id)->exists();
+    }
+
+    public function classSessions(Request $request, Kelas $kelas): JsonResponse
+    {
+        abort_unless($this->canManage($kelas, $request->user()), 403, 'Bukan kelas Anda.');
+        $kelas->load('program:id,name', 'school:id,name');
+
+        $sessions = Session::where('class_id', $kelas->id)
+            ->withCount(['attendances as hadir' => fn($x) => $x->where('status', 'hadir')])
+            ->orderByDesc('started_at')
+            ->get(['id', 'week', 'status', 'is_manual', 'started_at', 'ended_at', 'trainer_id']);
+
+        return $this->success([
+            'class'    => ['id' => $kelas->id, 'name' => $kelas->name, 'program' => optional($kelas->program)->name, 'school' => optional($kelas->school)->name, 'active_count' => $kelas->students()->where('students.status', 'aktif')->count()],
+            'sessions' => $sessions,
+        ], 'Daftar sesi kelas.');
+    }
+
+    public function manualStore(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'class_id' => ['required', 'exists:classes,id'],
+            'date'     => ['required', 'date'],
+        ]);
+        $kelas = Kelas::findOrFail($data['class_id']);
+        $user = $request->user();
+        abort_unless($this->canManage($kelas, $user), 403, 'Bukan kelas Anda.');
+
+        $perPeriod = max(1, (int) ($kelas->meetings_per_period ?: 4));
+        $week = (Session::where('class_id', $kelas->id)->count() % $perPeriod) + 1;
+
+        // trainer: kalau pembuat trainer → dia; kalau admin → trainer utama kelas
+        $trainerId = $user->role === 'trainer' ? $user->id : ($kelas->trainer_id ?? $user->id);
+
+        $session = Session::create([
+            'class_id'   => $kelas->id,
+            'period_id'  => null,
+            'week'       => $week,
+            'trainer_id' => $trainerId,
+            'started_at' => \Carbon\Carbon::parse($data['date'])->startOfDay(),
+            'status'     => 'started',   // terbuka untuk diisi absensi
+            'is_manual'  => true,
+        ]);
+        return $this->success($session, 'Sesi manual dibuat.', 201);
     }
 }

@@ -21,7 +21,8 @@ class Session extends Model
         'end_longitude',
         'end_photo',
         'period_id',
-        'week'
+        'week',
+        'is_manual',
     ];
 
     protected $casts = [
@@ -29,6 +30,7 @@ class Session extends Model
         'ended_at'        => 'datetime',
         'start_latitude'  => 'float',
         'start_longitude' => 'float',
+        'is_manual' => 'boolean',
     ];
 
     public function kelas()
