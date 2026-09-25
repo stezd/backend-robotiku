@@ -1,0 +1,3 @@
+@echo off
+echo Starting Robotiku ERP Local Development Server (Windows Native)...
+composer run dev:win
