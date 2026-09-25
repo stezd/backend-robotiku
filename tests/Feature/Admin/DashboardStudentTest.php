@@ -21,8 +21,8 @@ class DashboardStudentTest extends TestCase
 
     public function test_dashboard_kpi(): void
     {
-        Student::create(['student_code' => 'A1', 'name' => 'A', 'gender' => 'L', 'status' => 'aktif', 'registration_type' => 'mandiri']);
-        Student::create(['student_code' => 'A2', 'name' => 'B', 'gender' => 'P', 'status' => 'berhenti', 'registration_type' => 'mandiri']);
+        Student::create(['student_code' => 'A1', 'name' => 'A', 'gender' => 'L', 'status' => 'aktif', 'registration_type' => 'mandiri', 'is_verified' => true]);
+        Student::create(['student_code' => 'A2', 'name' => 'B', 'gender' => 'P', 'status' => 'nonaktif', 'registration_type' => 'mandiri', 'is_verified' => true]);
         Invoice::create(['invoice_number' => 'INV-1', 'student_id' => 1, 'base_amount' => 200000, 'total_amount' => 350000, 'status' => 'lunas']);
 
         $this->actingAsRole('admin');
@@ -34,8 +34,8 @@ class DashboardStudentTest extends TestCase
 
     public function test_list_dan_filter_siswa(): void
     {
-        Student::create(['student_code' => 'A1', 'name' => 'Andi', 'gender' => 'L', 'status' => 'aktif', 'registration_type' => 'mandiri']);
-        Student::create(['student_code' => 'A2', 'name' => 'Budi', 'gender' => 'L', 'status' => 'cuti', 'registration_type' => 'instansi']);
+        Student::create(['student_code' => 'A1', 'name' => 'Andi', 'gender' => 'L', 'status' => 'aktif', 'registration_type' => 'mandiri', 'is_verified' => true]);
+        Student::create(['student_code' => 'A2', 'name' => 'Budi', 'gender' => 'L', 'status' => 'cuti', 'registration_type' => 'instansi', 'is_verified' => true]);
 
         $this->actingAsRole('admin');
         $this->getJson('/api/v1/siswa?status=cuti')->assertOk()->assertJsonCount(1, 'data.data');
