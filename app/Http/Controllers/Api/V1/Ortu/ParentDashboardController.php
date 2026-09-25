@@ -28,8 +28,11 @@ class ParentDashboardController extends Controller
             ->value('meetings_per_period') ?: 4);
         $perPeriod = max(1, $perPeriod);
 
-        $hadir = Attendance::where('student_id', $s->id)->where('status', 'hadir')->count();
-        $att   = Attendance::where('student_id', $s->id)->selectRaw('status, count(*) c')->groupBy('status')->pluck('c', 'status');
+        $att = Attendance::where('student_id', $s->id)
+            ->selectRaw('status, count(*) as c')
+            ->groupBy('status')
+            ->pluck('c', 'status');
+        $hadir = (int) ($att['hadir'] ?? 0);
 
         // Sekolah kelola-sendiri → ortu tidak melihat tagihan sama sekali
         $invoices = $selfManaged
