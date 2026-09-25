@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\BillingSetting;
 use App\Models\DiscountCode;
 use App\Models\Kelas;
 use App\Models\School;
@@ -24,14 +23,8 @@ class SampleSeeder extends Seeder
             'created_by' => $admin?->id,
         ]);
 
-        // Kelas + harga
+        // Kelas
         $kelas = Kelas::factory()->create(['trainer_id' => $trainer?->id]);
-        BillingSetting::create([
-            'class_id'         => $kelas->id,
-            'registration_fee' => 150000,
-            'price_per_cycle'  => 200000,
-            'updated_by'       => $admin?->id,
-        ]);
 
         // 5 siswa mandiri + orang tua
         Student::factory(5)->create()->each(function (Student $s) {
