@@ -52,7 +52,7 @@ class DashboardStudentTest extends TestCase
         $this->assertDatabaseHas('student_status_logs', [
             'student_id' => $s->id,
             'old_status' => 'aktif',
-            'new_status' => 'berhenti',
+            'new_status' => 'nonaktif',
             'changed_by_type' => 'user',
         ]);
     }
