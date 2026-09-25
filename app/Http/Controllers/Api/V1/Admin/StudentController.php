@@ -41,10 +41,19 @@ class StudentController extends Controller
 
     public function changeStatus(Request $request, Student $student): JsonResponse
     {
+        // Petakan 'berhenti' ke 'nonaktif' untuk backward compatibility
+        if ($request->input('status') === 'berhenti') {
+            $request->merge(['status' => 'nonaktif']);
+        }
+
         $data = $request->validate([
             'status' => ['required', 'in:aktif,nonaktif,lulus,cuti'],
             'note'   => ['nullable', 'string'],
         ]);
+
+        if ($student->status === $data['status']) {
+            return $this->error('Status murid sudah ' . $data['status'] . '.', 422);
+        }
 
         // "lulus" hanya Super Admin
         if ($data['status'] === 'lulus' && $request->user()->role !== 'super_admin') {
@@ -52,16 +61,15 @@ class StudentController extends Controller
         }
 
         $old = $student->status;
-        if ($old !== $data['status']) {
-            $student->update(['status' => $data['status']]);
-            StudentStatusLog::create([
-                'student_id' => $student->id,
-                'old_status' => $old,
-                'new_status' => $data['status'],
-                'note'       => $data['note'] ?? null,
-                'changed_by' => $request->user()->id,
-            ]);
-        }
+        $student->update(['status' => $data['status']]);
+        StudentStatusLog::create([
+            'student_id'      => $student->id,
+            'old_status'      => $old,
+            'new_status'      => $data['status'],
+            'note'            => $data['note'] ?? null,
+            'changed_by_type' => 'user',
+            'changed_by'      => $request->user()->id,
+        ]);
 
         return $this->success($student->fresh(), 'Status murid diperbarui.');
     }
