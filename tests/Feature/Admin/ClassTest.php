@@ -3,6 +3,7 @@
 namespace Tests\Feature\Admin;
 
 use App\Models\Kelas;
+use App\Models\Program;
 use App\Models\Student;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -28,10 +29,28 @@ class ClassTest extends TestCase
     public function test_buat_kelas_dengan_trainer(): void
     {
         $trainer = User::create(['name' => 'T', 'email' => 't@r.id', 'password' => bcrypt('x'), 'role' => 'trainer', 'is_active' => true]);
+        $program = Program::create([
+            'name' => 'Robotika Dasar',
+            'level' => 'beginner',
+            'registration_fee' => 150000,
+            'price_per_cycle' => 200000,
+            'is_active' => true,
+            'is_visible' => true,
+        ]);
         $this->actingAsRole('admin');
 
-        $this->postJson('/api/v1/kelas', ['name' => 'Robo Kids', 'trainer_id' => $trainer->id, 'capacity' => 15])
-            ->assertStatus(201)->assertJsonPath('data.name', 'Robo Kids');
+        // Kontrak sekarang (StoreClassRequest):
+        // - `program_id` wajib
+        // - trainer dikirim sebagai array `trainers[]`, bukan `trainer_id` di level atas
+        // - `total_periods` wajib karena kelas ini tanpa school_id (kelas mandiri)
+        $this->postJson('/api/v1/kelas', [
+            'program_id' => $program->id,
+            'name' => 'Robo Kids',
+            'capacity' => 15,
+            'meetings_per_period' => 4,
+            'total_periods' => 6,
+            'trainers' => [['trainer_id' => $trainer->id, 'role' => 'utama']],
+        ])->assertStatus(201)->assertJsonPath('data.name', 'Robo Kids');
     }
 
     public function test_trainer_id_harus_role_trainer(): void

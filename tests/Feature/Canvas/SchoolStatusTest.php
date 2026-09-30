@@ -61,8 +61,13 @@ class SchoolStatusTest extends TestCase
         $school = School::create(['name' => 'SD Z', 'pipeline_status' => 'prospek']);
         $this->actingAsRole('marketing');
 
-        $this->postJson("/api/v1/canvas/schools/{$school->id}/notes", ['note' => 'Follow up minggu depan'])
-            ->assertStatus(201);
+        // `kind` wajib (in:pertemuan,audit) dan divalidasi inline di dalam controller,
+        // bukan di StoreNoteRequest. `audit` dipilih karena itu default kolomnya dan
+        // tidak menuntut foto + latitude + longitude seperti `pertemuan`.
+        $this->postJson("/api/v1/canvas/schools/{$school->id}/notes", [
+            'kind' => 'audit',
+            'note' => 'Follow up minggu depan',
+        ])->assertStatus(201);
 
         $this->assertDatabaseHas('school_notes', ['school_id' => $school->id, 'note' => 'Follow up minggu depan']);
     }
