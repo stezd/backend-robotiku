@@ -132,14 +132,22 @@ class RegistrationService
             $dup = Student::where('name', $data['name'])->whereDate('birth_date', $data['birth_date'])->exists();
             if ($dup) throw new DomainException('Siswa dengan nama & tanggal lahir yang sama sudah terdaftar.');
 
-            $parent = StudentParent::updateOrCreate(
-                ['phone' => Phone::normalize($data['phone'])],
-                [
-                    'name'      => $data['parent_name'],
-                    'greeting'  => $data['greeting'] ?? null,
-                    'phone_alt' => isset($data['phone_alt']) ? Phone::normalize($data['phone_alt']) : null,
-                ]
-            );
+            // Data orang tua OPSIONAL pada jalur instansi.
+            // - Import CSV tidak punya kolom nomor HP sama sekali.
+            // - parents.name dan parents.phone keduanya NOT NULL, jadi keduanya
+            //   harus ada untuk boleh membuat baris (DaftarInstansiRequest
+            //   menjaga pasangannya lewat required_with).
+            $parent = null;
+            if (! empty($data['phone']) && ! empty($data['parent_name'])) {
+                $parent = StudentParent::updateOrCreate(
+                    ['phone' => Phone::normalize($data['phone'])],
+                    [
+                        'name'      => $data['parent_name'],
+                        'greeting'  => $data['greeting'] ?? null,
+                        'phone_alt' => isset($data['phone_alt']) ? Phone::normalize($data['phone_alt']) : null,
+                    ]
+                );
+            }
 
             $student = Student::create([
                 'student_code'      => $this->generateInstansiCode(),
@@ -151,7 +159,7 @@ class RegistrationService
                 'school_grade'      => $data['school_grade'] ?? null,
                 'allergy_notes'     => $data['allergy_notes'] ?? null,
                 'photo_permission'  => $data['photo_permission'] ?? false,
-                'parent_id'         => $parent->id,
+                'parent_id'         => $parent?->id,
                 'school_id'         => $schoolId,
                 'program_id'        => $data['program_id'] ?? null,
                 'period_quota'      => $quota ?: null,
