@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Daftar;
 
-use App\Models\BillingSetting;
 use App\Models\Kelas;
 use App\Models\School;
 use App\Models\SchoolAdmin;
@@ -23,7 +22,8 @@ class UploadExcelTest extends TestCase
         User::create(['name' => 'SA', 'email' => 'sa@r.id', 'password' => bcrypt('x'), 'role' => 'super_admin', 'is_active' => true]);
         $this->school = School::create(['name' => 'SD IT Bawamai', 'pipeline_status' => 'sudah_mou', 'is_mou' => true]);
         $this->kelas = Kelas::create(['name' => 'Robo Kids']);
-        BillingSetting::create(['class_id' => $this->kelas->id, 'registration_fee' => 100000, 'price_per_cycle' => 200000]);
+        // Harga tidak lagi tinggal di kelas: StudentImportService tidak membaca tarif sama sekali.
+        // Tarif instansi (kalau nanti diperlukan) ada di schools.registration_fee / price_per_cycle.
     }
 
     private function token(): string

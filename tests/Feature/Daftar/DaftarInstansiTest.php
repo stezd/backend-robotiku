@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Daftar;
 
-use App\Models\BillingSetting;
 use App\Models\Kelas;
 use App\Models\School;
 use App\Models\SchoolAdmin;
@@ -22,9 +21,15 @@ class DaftarInstansiTest extends TestCase
         User::create(['name' => 'SA', 'email' => 'sa@r.id', 'password' => bcrypt('x'), 'role' => 'super_admin', 'is_active' => true]);
         User::create(['name' => 'AK', 'email' => 'ak@r.id', 'password' => bcrypt('x'), 'role' => 'admin_keuangan', 'is_active' => true]);
 
-        $this->school = School::create(['name' => 'SD IT Bawamai', 'pipeline_status' => 'sudah_mou', 'is_mou' => true]);
+        // instansi: harga datang dari sekolah (RegistrationService::registerInstansi)
+        $this->school = School::create([
+            'name' => 'SD IT Bawamai',
+            'pipeline_status' => 'sudah_mou',
+            'is_mou' => true,
+            'registration_fee' => $reg,
+            'price_per_cycle' => $cycle,
+        ]);
         $this->kelas = Kelas::create(['name' => 'IoT Junior']);
-        BillingSetting::create(['class_id' => $this->kelas->id, 'registration_fee' => $reg, 'price_per_cycle' => $cycle]);
     }
 
     private function schoolAdminToken(): string

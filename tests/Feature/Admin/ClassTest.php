@@ -57,17 +57,6 @@ class ClassTest extends TestCase
         $this->assertDatabaseCount('class_students', 2);
     }
 
-    public function test_set_harga_kelas(): void
-    {
-        $this->actingAsRole('admin');
-        $kelas = Kelas::create(['name' => 'A']);
-
-        $this->putJson("/api/v1/kelas/{$kelas->id}/harga", ['registration_fee' => 150000, 'price_per_cycle' => 200000])
-            ->assertOk();
-
-        $this->assertDatabaseHas('billing_settings', ['class_id' => $kelas->id, 'registration_fee' => 150000]);
-    }
-
     public function test_trainer_tidak_boleh_kelola_kelas(): void
     {
         $this->actingAsRole('trainer');
