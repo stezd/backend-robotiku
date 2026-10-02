@@ -54,11 +54,16 @@ class SchoolController extends Controller
 
     public function store(SchoolRequest $request): JsonResponse
     {
-        $school = \App\Models\School::create($request->validated() + [
+        $data = $request->validated();
+        $pipelineStatus = $data['pipeline_status'] ?? $request->input('pipeline_status', 'prospek');
+        $data['pipeline_status'] = $pipelineStatus;
+        $data['is_mou'] = array_key_exists('is_mou', $data) && $data['is_mou'] !== null
+            ? (bool) $data['is_mou']
+            : ($pipelineStatus === 'sudah_mou');
+        $data['created_by'] = $request->user()->id;
+
+        $school = School::create($data + [
             'commission_percent' => $request->input('commission_percent', 10),
-            'pipeline_status'     => $request->input('pipeline_status', 'prospek'),
-            'is_mou'              => false,
-            'created_by'          => $request->user()->id,
         ]);
 
         return $this->success($school, 'Sekolah ditambahkan.', 201);
@@ -72,7 +77,11 @@ class SchoolController extends Controller
 
     public function update(SchoolRequest $request, \App\Models\School $school): JsonResponse
     {
-        $school->update($request->validated());
+        $data = $request->validated();
+        if (isset($data['pipeline_status']) && !array_key_exists('is_mou', $data)) {
+            $data['is_mou'] = ($data['pipeline_status'] === 'sudah_mou');
+        }
+        $school->update($data);
         return $this->success($school->fresh(), 'Data sekolah diperbarui.');
     }
 

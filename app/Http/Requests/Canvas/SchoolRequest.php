@@ -23,6 +23,7 @@ class SchoolRequest extends FormRequest
             'photo'              => ['nullable', 'string', 'max:255'],  // path hasil upload
             'commission_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'pipeline_status'    => ['nullable', 'in:prospek,dalam_proses,sudah_mou,tidak_lanjut'],
+            'is_mou'             => ['nullable', 'boolean'],
             "registration_fee" => "nullable:integer,min:0",
             "price_per_cycle"  => "nullable:integer,min:0",
             'latitude'        => ['nullable', 'numeric', 'between:-90,90'],
