@@ -21,9 +21,17 @@ class ClassTest extends TestCase
         return $u;
     }
 
-    private function student(): Student
+    private function student(?int $programId = null): Student
     {
-        return Student::create(['student_code' => 'S' . uniqid(), 'name' => 'Murid', 'gender' => 'L', 'status' => 'aktif', 'registration_type' => 'mandiri']);
+        return Student::create([
+            'student_code'      => 'S' . uniqid(),
+            'name'              => 'Murid',
+            'gender'            => 'L',
+            'status'            => 'aktif',
+            'registration_type' => 'mandiri',
+            'is_verified'       => true,
+            'program_id'        => $programId,
+        ]);
     }
 
     public function test_buat_kelas_dengan_trainer(): void
@@ -64,9 +72,17 @@ class ClassTest extends TestCase
     public function test_assign_murid_tanpa_duplikat(): void
     {
         $this->actingAsRole('admin');
-        $kelas = Kelas::create(['name' => 'A']);
-        $s1 = $this->student();
-        $s2 = $this->student();
+        $program = Program::create([
+            'name'             => 'Robotika Dasar',
+            'level'            => 'beginner',
+            'registration_fee' => 150000,
+            'price_per_cycle'  => 200000,
+            'is_active'        => true,
+            'is_visible'       => true,
+        ]);
+        $kelas = Kelas::create(['name' => 'A', 'program_id' => $program->id]);
+        $s1 = $this->student($program->id);
+        $s2 = $this->student($program->id);
 
         $this->postJson("/api/v1/kelas/{$kelas->id}/murid", ['student_ids' => [$s1->id, $s2->id]])->assertOk();
         // assign ulang s1 → tidak dobel
