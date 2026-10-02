@@ -247,7 +247,7 @@ Route::prefix('v1')->group(function () {
             Route::get('admin/artikel/{article}', [ArticleController::class, 'show']);
             Route::put('admin/artikel/{article}', [ArticleController::class, 'update']);
             Route::delete('admin/artikel/{article}', [ArticleController::class, 'destroy']);
-            Route::get('absensi-karyawan/rekap', [SessionController::class, 'rekap']);
+            Route::get('absensi-karyawan/rekap', [EmployeeAttendanceController::class, 'index']);
             Route::delete('absensi-karyawan/{employeeAttendance}', [EmployeeAttendanceController::class, 'destroy']);
             Route::get('promo', [DiscountCodeController::class, 'index']);
             Route::post('promo', [DiscountCodeController::class, 'store']);
