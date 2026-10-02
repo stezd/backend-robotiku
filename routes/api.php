@@ -217,6 +217,7 @@ Route::prefix('v1')->group(function () {
             Route::get('sesi/{session}/murid', [SessionController::class, 'students']);
             Route::post('sesi/{session}/absensi', [SessionController::class, 'attend']);
             Route::post('sesi/{session}/selesai', [SessionController::class, 'end']);
+            Route::delete('sesi/{session}/batal', [SessionController::class, 'cancel']);
         });
 
         Route::middleware('role:admin,super_admin')->group(function () {

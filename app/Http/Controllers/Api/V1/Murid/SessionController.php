@@ -12,6 +12,7 @@ use App\Models\Student;
 use App\Services\BillingCycleService;
 use App\Services\WhatsappService;
 use App\Support\ImageStorage;
+use App\Support\MediaStorage;
 use App\Traits\ApiResponse;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -222,6 +223,31 @@ class SessionController extends Controller
         }
 
         return $this->success($session->fresh(), 'Sesi selesai.');
+    }
+
+    public function cancel(Request $request, Session $session): JsonResponse
+    {
+        abort_unless($this->canManageSession($session, $request->user()), 403, 'Bukan sesi Anda.');
+
+        if ($session->status === 'ended') {
+            return $this->error('Sesi yang sudah selesai tidak dapat dibatalkan.', 422);
+        }
+
+        DB::transaction(function () use ($session) {
+            foreach ($session->attendances()->whereNotNull('photo')->get() as $att) {
+                if ($att->photo) {
+                    MediaStorage::delete($att->photo);
+                }
+            }
+            $session->attendances()->delete();
+
+            if ($session->start_photo) {
+                MediaStorage::delete($session->start_photo);
+            }
+            $session->delete();
+        });
+
+        return $this->success(null, 'Sesi berhasil dibatalkan dan dihapus.');
     }
 
     /* helpers */
