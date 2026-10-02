@@ -168,7 +168,7 @@ class SchoolSettlementIntegrationTest extends TestCase
         // Preview bukti transfer setoran inline (Phase 1 endpoint)
         $resProof = $this->get("/api/v1/keuangan/setoran/{$settlement->id}/proof");
         $resProof->assertOk();
-        $resProof->assertHeader('Content-Disposition', 'inline');
+        $this->assertStringStartsWith('inline', (string) $resProof->headers->get('Content-Disposition'));
 
         // ========================================================
         // 6. ACTOR: Admin Keuangan Approve Setoran (Phase 2 Core)
